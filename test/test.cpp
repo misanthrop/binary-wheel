@@ -1,12 +1,10 @@
 #include <iostream>
 #include <vector>
-#include <bandit/bandit.h>
 #include <binarywheel.hpp>
 #include <testtypes.hpp>
+#include "lest.hpp"
 
 using namespace std;
-using namespace snowhouse;
-using namespace bandit;
 
 bool operator==(const Nested& a, const Nested& b) { return ~a == ~b; }
 bool operator==(const EnumStruct& a, const EnumStruct& b) { return ~a == ~b; }
@@ -51,49 +49,46 @@ const NumStruct n1 = { -12400, 49312, -1230340234, 4012321632, 0.6, 0.3199969481
 const vector<uint8_t> n1ub = {144,207,160,192,118,127,170,182,96,43,39,239,153,235,81};
 const vector<char> n1b(n1ub.begin(), n1ub.end());
 
-go_bandit([]()
+const lest::test tests[] =
 {
-	describe("empty", []()
+	CASE("empty")
 	{
-		it("toString", []() { AssertThat(bw::toString(t0), Equals(t0s)); });
-		it("byteLength", []() { AssertThat(bw::byteLength(t0), Equals(t0b.size())); });
-		it("pack", []() { AssertThat(bw::pack(t0), Equals(t0b)); });
-		it("unpack", []() { AssertThat(bw::unpack<TestStruct>(t0b), Equals(t0)); });
-	});
+		EXPECT(bw::toString(t0) == t0s);
+		EXPECT(bw::byteLength(t0) == t0b.size());
+		EXPECT(bw::pack(t0) == t0b);
+		EXPECT(bw::unpack<TestStruct>(t0b) == t0);
+	},
 
-	describe("enums", []()
+	CASE("enums")
 	{
-		it("byteLength", []() { AssertThat(bw::byteLength(e1), Equals(e1b.size())); });
-		it("pack", []() { AssertThat(bw::pack(e1), Equals(e1b)); });
-		it("unpack", []() { AssertThat(bw::unpack<vector<EnumStruct>>(e1b), Equals(e1)); });
-	});
+		EXPECT(bw::byteLength(e1) == e1b.size());
+		EXPECT(bw::pack(e1) == e1b);
+		EXPECT(bw::unpack<vector<EnumStruct>>(e1b) == e1);
+	},
 
-	describe("numbers", []()
+	CASE("numbers")
 	{
-		it("byteLength", []() { AssertThat(bw::byteLength(n1), Equals(n1b.size())); });
-		it("pack", []() { AssertThat(bw::pack(n1), Equals(n1b)); });
-		it("unpack", []() { AssertThat(bw::unpack<NumStruct>(n1b), Equals(n1)); });
-	});
+		EXPECT(bw::byteLength(n1) == n1b.size());
+		EXPECT(bw::pack(n1) == n1b);
+		EXPECT(bw::unpack<NumStruct>(n1b) == n1);
+	},
 
-	describe("complex", []()
+	CASE("complex")
 	{
-		it("toString", []() { AssertThat(bw::toString(t1), Equals(t1s)); });
-		it("byteLength", []() { AssertThat(bw::byteLength(t1), Equals(t1b.size())); });
-		it("pack", []() { AssertThat(bw::pack(t1), Equals(t1b)); });
-		it("unpack", []() { AssertThat(bw::unpack<TestStruct>(t1b), Equals(t1)); });
-	});
+		EXPECT(bw::toString(t1) == t1s);
+		EXPECT(bw::byteLength(t1) == t1b.size());
+		EXPECT(bw::pack(t1) == t1b);
+		EXPECT(bw::unpack<TestStruct>(t1b) == t1);
+	},
 
-	describe("other", []()
+	CASE("other")
 	{
-		it("write parse", []()
-		{
-			TestStruct x;
-			bw::unpackFrom(bw::pack(t0), x);
-			AssertThat(x, Equals(t0));
-			bw::unpackFrom(bw::pack(t1), x);
-			AssertThat(x, Equals(t1));
-		});
-	});
-});
+		TestStruct x;
+		bw::unpackFrom(bw::pack(t0), x);
+		EXPECT(x == t0);
+		bw::unpackFrom(bw::pack(t1), x);
+		EXPECT(x == t1);
+	}
+};
 
-int main(int argc, char* argv[]) { return run(argc, argv); }
+int main(int argc, char* argv[]) { return lest::run(tests, argc, argv); }

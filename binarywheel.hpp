@@ -19,28 +19,6 @@ namespace bw
 	template<template<class...> class TT, class X> constexpr bool is_same_template = false;
 	template<template<class...> class TT, class... P> constexpr bool is_same_template<TT, TT<P...>> = true;
 
-	inline constexpr uint8_t popCount(uint32_t bits)
-	{
-		#if __GNUC__
-		return __builtin_popcount(bits);
-		#else
-		bits -= (bits >> 1) & 0x55555555;
-		bits = (bits & 0x33333333) + ((bits >> 2) & 0x33333333);
-		return (((bits + (bits >> 4)) & 0x0f0f0f0f) * 0x01010101) >> 24;
-		#endif
-	}
-
-	inline constexpr uint32_t bitMask(uint32_t bits)
-	{
-		bits |= bits >> 1;
-		bits |= bits >> 2;
-		bits |= bits >> 4;
-		bits |= bits >> 8;
-		return bits |= bits >> 16;
-	}
-
-	inline constexpr uint8_t bitsNeeded(uint32_t v) { return popCount(bitMask(v)); }
-
 	struct Reader
 	{
 		Reader(const char* from, const char* to) : from(from), to(to) {}
@@ -153,7 +131,7 @@ namespace bw
 
 	template<class T> struct Type<T, std::enable_if_t<std::is_enum<T>::value, void>>
 	{
-		static constexpr uint8_t bits = bitsNeeded(EnumCount<T> - 1);
+		static constexpr uint8_t bits = 32 - __builtin_clz(EnumCount<T> - 1);
 		static std::string toString(const T& x) { return std::to_string((uint8_t)x); }
 		static size_t bitLength(const T&) { return bits; }
 		static void unpackFrom(Reader& r, T& x) { x = (T)r.readBits(bits); }

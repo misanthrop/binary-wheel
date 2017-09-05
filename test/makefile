@@ -18,7 +18,7 @@ clean:
 
 $(temp)/%.cpp.o: %.cpp $(temp)/testtypes.hpp makefile
 	@mkdir -p $(@D)
-	$(CXX) -MMD -MP -MF $@.d $(cov) -I.. -Ibandit -I$(temp) -c $< -o $@
+	$(CXX) -MMD -MP -MF $@.d $(cov) -I.. -I$(temp) -c $< -o $@
 
 $(out)/test: $(temp)/test.cpp.o makefile
 	@mkdir -p $(@D)
@@ -30,10 +30,10 @@ $(temp)/testtypes.hpp: testtypes.coffee ../cpp.coffee makefile
 
 $(out)/cpp.info: $(out)/test makefile
 	@rm -f $@
-	@lcov -q --gcov-tool=$(GCOV) --no-external -i -c -b . -d $(temp)/ -o $@
+	@lcov -q --gcov-tool=$(GCOV) -i -c -b .. -d $(temp)/ -o $@
 	$(out)/test
-	@lcov -q --gcov-tool=$(GCOV) --no-external -c -b . -d $(temp)/ -o $@
-	@lcov -q --gcov-tool=$(GCOV) -r $@ '*bandit/*' -o $@
+	@lcov -q --gcov-tool=$(GCOV) -c -b .. -d $(temp)/ -o $@
+	@lcov -q --gcov-tool=$(GCOV) -e $@ '*/binarywheel.hpp' -o $@
 
 $(out)/coffee.info: *.coffee ../*.coffee
 	npm run -s test

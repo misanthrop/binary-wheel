@@ -1,3 +1,0 @@
-[submodule "test/bandit"]
-	path = test/bandit
-	url = git@github.com:banditcpp/bandit.git
