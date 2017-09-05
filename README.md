@@ -10,8 +10,8 @@ Emotion = bw.enum ['Smile', 'Sad', 'Evil']
 
 Message = bw.struct [
   ['nickname', bw.string]
-  ['message' bw.string]
-  ['emotion' bw.optional Emotion]]
+  ['message', bw.string]
+  ['emotion', bw.optional Emotion]]
   
 # pack binary data
 buffer = bw.pack Message,
