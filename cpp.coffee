@@ -2,11 +2,13 @@ path = require 'path'
 bw = require '.'
 
 publicTypes = require path.resolve process.argv[2]
+namespace = process.argv[3]
 allTypes = {}
 
 decls =
 	forward: []
 	other: []
+	adapters: []
 
 newName = (nameHint) ->
 	name = nameHint
@@ -15,20 +17,22 @@ newName = (nameHint) ->
 		name = "#{nameHint}#{i += 1}"
 	name
 
-register = (type, hint) ->
+register = (type, hint, pub = false) ->
 	name = type.typename? hint
 	if not type.name?
 		allTypes[type.name = name] = type
+	type.pub or= pub
 	type.name
 
-declare = (type) -> if not type.declared
+declare = (type) -> if not type.declared and type.pub
 	type.declared = true
 	if deps = type.dependencies?()
 		for n, t of deps
 			declare t
-	noDeps = type instanceof bw.Enum or type instanceof bw.Scaled
-	decl = type.declaration?() ? (type.spec and type.name != type.spec and "using #{type.name} = #{type.spec};" or "")
-	decls[if noDeps then 'forward' else 'other'].push decl
+	decl = type.declaration?() ? (type.spec and type.name != type.spec and "using #{type.name} = #{type.spec}" or "")
+	decls[if not deps then 'forward' else 'other'].push decl
+	if adapt = type.adapter?()
+		decls.adapters.push adapt
 
 capitalizeFirstLetter = (s) -> s[0].toUpperCase() + s.substring 1
 
@@ -49,9 +53,10 @@ bw.uint32.name = 'uint32_t'
 bw.float32.name = 'float'
 bw.string.name = 'std::string'
 
-bw.List::typename = (hint) -> @spec = "std::vector<#{register @type, hint}>"
-bw.Optional::typename = (hint) -> @spec = "std::optional<#{register @type, hint}>"
-bw.Scaled::typename = (hint = 'Scaled') -> @spec = "bw::Scaled<#{@type.name}, #{hex floatAsUint32 @min} /*#{@min}*/, #{hex floatAsUint32 @max} /*#{@max}*/>"
+templateFloat = (v) -> if v then "#{hex floatAsUint32 v} /*#{v}*/" else 0
+bw.List::typename = (hint) -> @spec = "std::vector<#{register @type, hint, true}>"
+bw.Optional::typename = (hint) -> @spec = "std::optional<#{register @type, hint, true}>"
+bw.Scaled::typename = (hint = 'Scaled') -> @spec = "bw::Scaled<#{@type.name}, #{templateFloat @min}, #{templateFloat @max}>"
 bw.Enum::typename = (hint = 'Enum') -> newName hint
 
 bw.Struct::typename = (hint = 'Struct') ->
@@ -71,45 +76,64 @@ bw.Struct::dependencies = ->
 	delete @inStack
 	deps
 
-bw.Enum::declaration = -> """
-	enum class #{@name} : uint8_t { #{@members.join ', '} };
-	namespace bw { template<> constexpr int EnumCount<#{@name}> = #{@members.length}; }
-	"""
+bw.Enum::declaration = -> "enum class #{@name} : uint8_t { #{@members.join ', '} }"
+bw.Enum::adapter = -> "template<> constexpr int EnumCount<#{@name}> = #{@members.length};"
 
-bw.Struct::declaration = ->
-	members = @members.map ([name, type]) -> "#{type.name} #{name};"
-	memberNames = @members.map ([name]) -> name
+cppValue = (value) ->
+	if value instanceof Array
+		"{ #{value.map((v) -> cppValue v).join ', '} }"
+	else if value instanceof String
+		'"' + value + '"'
+	else
+		value
+
+valueAssignment = (value) ->
+	if value?
+		" = #{cppValue value}"
+	else
+		""
+
+bw.Struct::declaration = (ident = '') ->
+	members = @members.map ([name, type, value]) ->
+		"#{if type.pub or not type.declaration? then type.name else type.declaration ident + '\t'} #{name}#{valueAssignment value};"
+	params = @members.map ([name]) -> name
 	"""
-	struct #{@name} {
-		#{members.join '\n\t'}
-		auto operator~() const { return std::forward_as_tuple(#{memberNames.join ', '}); }
-		auto operator~() { return std::forward_as_tuple(#{memberNames.join ', '}); }
-	};
+	struct#{if @pub then ' ' + @name else ''}
+	#{ident}{
+	#{ident}	#{members.join '\n\t' + ident}
+	#{ident}	auto operator~() const { return std::forward_as_tuple(#{params.join ', '}); }
+	#{ident}	auto operator~() { return std::forward_as_tuple(#{params.join ', '}); }
+	#{ident}}
 	"""
 
 for name, type of publicTypes
 	allTypes[type.name = name] = type
 
 for name, type of publicTypes
-	register type, name
+	register type, name, true
 
 for name, type of allTypes
 	declare type
 
-decls.structs = for name, type of allTypes when type instanceof bw.Struct
-	"struct #{name};"
+for name, type of allTypes when type.pub and type instanceof bw.Struct
+	decls.forward.push "struct #{name}"
 
-decls.forward = decls.forward.filter (x) -> x
-decls.other = decls.other.filter (x) -> x
+for t in ['forward', 'other']
+	decls[t] = decls[t].filter (x) -> x
 
 process.stdout.write """
 	#pragma once
 	#include <binarywheel.hpp>
 
-	#{decls.forward.join '\n\n'}
+	#{if namespace then 'namespace ' + namespace + '\n{' else ''}
+	#{decls.forward.join ';\n'};
 
-	#{decls.structs.join '\n'}
+	#{decls.other.join ';\n\n'};
+	#{if namespace then '}' else ''}
 
-	#{decls.other.join '\n\n'}
+	namespace bw
+	{
+	#{decls.adapters.join '\n'}
+	}
 
 	"""
