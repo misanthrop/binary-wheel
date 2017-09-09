@@ -7,6 +7,7 @@
 #include <cstring>
 #include <cassert>
 #include <tuple>
+#include <vector>
 #if __cplusplus <= 201402L
 #include <experimental/optional>
 namespace std { using namespace std::experimental; }
