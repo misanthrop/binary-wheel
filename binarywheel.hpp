@@ -113,7 +113,8 @@ namespace bw
 	template<class U, uint32_t Min, uint32_t Max> struct Scaled
 	{
 		U value;
-		Scaled(float v = 0) { *this = v; }
+		Scaled() {}
+		Scaled(float v) { *this = v; }
 		static float min() { return asFloat(Min); }
 		static float max() { return asFloat(Max); }
 		operator float() const { return scale(value, std::numeric_limits<U>::min(), std::numeric_limits<U>::max(), min(), max()); }
