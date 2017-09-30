@@ -194,7 +194,8 @@ module.exports =
 	enum: (members) -> new Enum members
 	optional: (type) -> new Optional type
 	list: (type) -> new List type
-	struct: (members) -> new Struct members
+	struct: (members) -> new Struct if members instanceof Array then members else for key, value of members
+		if value instanceof Array then [key, value[0], value[1]] else [key, value]
 	Scaled: Scaled
 	Enum: Enum
 	Optional: Optional
