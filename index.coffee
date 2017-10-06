@@ -21,6 +21,8 @@ class Reader
 		@data = new Uint8Array buf
 		@view = new DataView buf
 		@cur = 0
+	bytesLeft: -> @data.length - @cur
+	resetBits: -> delete @bitsLeft
 	readBits: (count) ->
 		result = 0
 		pos = 0
