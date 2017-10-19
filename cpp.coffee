@@ -18,10 +18,14 @@ newName = (nameHint) ->
 	name
 
 register = (type, hint, pub = false) ->
-	name = type.typename? hint
-	if not type.name?
-		allTypes[type.name = name] = type
-	type.pub or= pub
+	type.pub or= pub or type instanceof bw.Enum
+	if not type.registered
+		type.registered = true
+		name = type.typename? hint
+		if not type.name?
+			allTypes[type.name = name] = type
+		if adapt = type.adapter?()
+			decls.adapters.push adapt
 	type.name
 
 declare = (type) -> if not type.declared and type.pub
@@ -31,8 +35,6 @@ declare = (type) -> if not type.declared and type.pub
 			declare t
 	decl = type.declaration?() ? (type.spec and type.name != type.spec and "using #{type.name} = #{type.spec}" or "")
 	decls[if not deps then 'forward' else 'other'].push decl
-	if adapt = type.adapter?()
-		decls.adapters.push adapt
 
 capitalizeFirstLetter = (s) -> s[0].toUpperCase() + s.substring 1
 
@@ -115,8 +117,10 @@ for name, type of publicTypes
 for name, type of allTypes
 	declare type
 
-for name, type of allTypes when type.pub and type instanceof bw.Struct
-	decls.forward.push "struct #{name}"
+forwardStructs = for name, type of allTypes when type.pub and type instanceof bw.Struct
+	"struct #{name}"
+
+decls.forward = forwardStructs.concat decls.forward
 
 for t in ['forward', 'other']
 	decls[t] = decls[t].filter (x) -> x
