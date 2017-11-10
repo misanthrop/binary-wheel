@@ -78,8 +78,16 @@ class Writer
 		@end += v.length
 	content: -> @data.buffer.slice 0, @end
 
-class Primitive
-	constructor: (@t, @bits, @min, @max) -> @t += @bits
+class Type
+	byteLength: (v) -> (7 + @bitLength v)//8
+	unpack: (buf) -> @unpackFrom new Reader buf
+	pack: (v) ->
+		w = new Writer @byteLength v
+		@packInto w, v
+		w.data.buffer
+
+class Primitive extends Type
+	constructor: (@t, @bits, @min, @max) -> super(); @t += @bits
 	bitLength: -> @bits
 	unpackFrom: (r) -> r[@t]()
 	packInto: (w, v) -> w[@t] v
@@ -90,8 +98,8 @@ bytesBitsNeeded = (v) ->
 	else
 		if v <= 0xffffffff then 2 else 3
 
-class VarInt
-	constructor: (@format) ->
+class VarInt extends Type
+	constructor: (@format) -> super()
 	bitLength: (v) -> 2 + 8*(1 << bytesBitsNeeded v)
 	unpackFrom: (r) ->
 		bb = r.readBits 2
@@ -106,7 +114,7 @@ class VarInt
 varint = new VarInt ['i8', 'i16', 'i32']
 varuint = new VarInt ['u8', 'u16', 'u32']
 
-class Utf8String
+class Utf8String extends Type
 	bitLength: (v) ->
 		l = stringToUtf8(v).length
 		varuint.bitLength(l) + 8*l
@@ -118,14 +126,15 @@ class Utf8String
 		varuint.packInto w, b.length
 		w.buf b
 
-class Scaled
-	constructor: (@type, @min, @max) ->
+class Scaled extends Type
+	constructor: (@type, @min, @max) -> super()
 	bitLength: -> @type.bits
 	unpackFrom: (r) -> scale @type.unpackFrom(r), @type.min, @type.max, @min, @max
 	packInto: (w, v) -> @type.packInto w, scale v, @min, @max, @type.min, @type.max
 
-class Enum
+class Enum extends Type
 	constructor: (@members) ->
+		super()
 		@index = {}
 		for name, i in @members
 			@index[name] = i
@@ -139,16 +148,16 @@ class Enum
 		else
 			throw new Error "Unknown enum value #{v}"
 
-class Optional
-	constructor: (@type) ->
+class Optional extends Type
+	constructor: (@type) -> super()
 	bitLength: (v) -> if v? then 1 + @type.bitLength v else 1
 	unpackFrom: (r) -> if r.i1() then @type.unpackFrom r
 	packInto: (w, v) ->
 		w.i1 v?
 		if v? then @type.packInto w, v
 
-class List
-	constructor: (@type) ->
+class List extends Type
+	constructor: (@type) -> super()
 	bitLength: (v) ->
 		s = varuint.bitLength v.length
 		for x in v
@@ -163,8 +172,8 @@ class List
 		for x in v
 			@type.packInto w, x
 
-class Struct
-	constructor: (@members) ->
+class Struct extends Type
+	constructor: (@members) -> super()
 	bitLength: (v) ->
 		s = 0
 		for [name, type] in @members
@@ -179,8 +188,6 @@ class Struct
 	packInto: (w, value) ->
 		for [name, type] in @members
 			type.packInto w, value[name]
-
-byteLength = (type, v) -> (7 + type.bitLength v)//8
 
 module.exports =
 	bool: new Primitive 'i', 1, 0, 1
@@ -205,9 +212,3 @@ module.exports =
 	Struct: Struct
 	Reader: Reader
 	Writer: Writer
-	byteLength: byteLength
-	unpack: (type, buf) -> type.unpackFrom new Reader buf
-	pack: (type, v) ->
-		w = new Writer byteLength type, v
-		type.packInto w, v
-		w.data.buffer

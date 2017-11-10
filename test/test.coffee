@@ -39,13 +39,13 @@ assertBuffersEqual = (a, b) ->
 
 for name, x of data
 	describe name, -> do (x) ->
-		it 'byteLength', -> assert.equal bw.byteLength(x.type, x.value), x.bytes.byteLength
-		it 'pack', -> assertBuffersEqual bw.pack(x.type, x.value), x.bytes
-		it 'unpack', -> assert.deepStrictEqual bw.unpack(x.type, x.bytes), x.value
+		it 'byteLength', -> assert.equal x.type.byteLength(x.value), x.bytes.byteLength
+		it 'pack', -> assertBuffersEqual x.type.pack(x.value), x.bytes
+		it 'unpack', -> assert.deepStrictEqual x.type.unpack(x.bytes), x.value
 
 describe 'errors', ->
 	it 'unknown enum value', ->
 		assert.throws ->
-			bw.pack tt.TestStruct,
+			tt.TestStruct.pack
 				a: [], b0: true, o1: 1, s: '', b3: true, u: 1, o4: 'F', i: -10, b5: false, o6: [], f: 1.5
 			, Error, 'Unknown enum value F'

@@ -12,15 +12,15 @@ Message = bw.struct [
   ['nickname', bw.string]
   ['message', bw.string]
   ['emotion', bw.optional Emotion]]
-  
+
 # pack binary data
-buffer = bw.pack Message,
+buffer = Message.pack
   nickname: 'John'
   message: 'Hi!'
   emotion: 'Smile'
 
 # unpack to JS object
-message = bw.unpack Message, buffer
+message = Message.unpack buffer
 ```
 
 ## Supported types
