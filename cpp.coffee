@@ -1,8 +1,12 @@
 path = require 'path'
 bw = require '.'
 
-publicTypes = require path.resolve process.argv[2]
-namespace = process.argv[3]
+options = require('command-line-args') [
+	{ name: 'src', type: String, defaultOption: true }
+	{ name: 'namespace', alias: 'n', type: String, defaultValue: '' }
+	{ name: 'out', alias: 'o', type: String, defaultValue: '' }]
+
+publicTypes = require path.resolve options.src
 allTypes = {}
 
 decls =
@@ -125,15 +129,15 @@ decls.forward = forwardStructs.concat decls.forward
 for t in ['forward', 'other']
 	decls[t] = decls[t].filter (x) -> x
 
-process.stdout.write """
+resultSource = """
 	#pragma once
 	#include <binarywheel.hpp>
 
-	#{if namespace then 'namespace ' + namespace + '\n{' else ''}
+	#{if options.namespace then 'namespace ' + options.namespace + '\n{' else ''}
 	#{decls.forward.join ';\n'};
 
 	#{decls.other.join ';\n\n'};
-	#{if namespace then '}' else ''}
+	#{if options.namespace then '}' else ''}
 
 	namespace bw
 	{
@@ -141,3 +145,8 @@ process.stdout.write """
 	}
 
 	"""
+
+if options.out
+	require('fs').writeFileSync options.out, resultSource
+else
+	process.stdout.write resultSource

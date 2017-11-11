@@ -18,7 +18,9 @@
         "mocha": "^3.5.0",
         "nyc": "^11.1.0"
     },
-    "dependencies": {},
+    "dependencies": {
+        "command-line-args": "^4.0.7"
+    },
     "nyc": {
         "extension": [
             ".coffee"
