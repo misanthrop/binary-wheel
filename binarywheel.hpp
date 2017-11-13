@@ -65,35 +65,41 @@ namespace bw
 
 	struct Writer
 	{
-		Writer(std::vector<char>& dest) : dest(dest) {}
+		Writer(char* data, size_t size) : bytes(data), bytesLeft(size) {}
 
 		void write(const void* src, size_t len)
 		{
-			dest.insert(dest.end(), (const char*)src, (const char*)src + len);
+			assert(len <= bytesLeft);
+			memcpy(bytes, src, len);
+			bytes += len;
+			bytesLeft -= len;
 		}
 
-		void writeBits(uint32_t bits, uint8_t count)
+		void writeBits(uint32_t srcBits, uint8_t count)
 		{
+			assert(count <= bytesLeft*8 + bitsLeft);
 			while(count)
 			{
 				if(!bitsLeft)
 				{
-					bitsPos = dest.size();
-					dest.push_back(0);
+					bits = bytes++;
+					bytesLeft--;
 					bitsLeft = 8;
+					*bits = 0;
 				}
 				uint8_t bitsToWrite = std::min(bitsLeft, count);
 				uint8_t mask = (uint32_t(1) << bitsToWrite) - 1;
-				dest[bitsPos] |= (mask & bits) << (8 - bitsLeft);
+				*bits |= (mask & srcBits) << (8 - bitsLeft);
 				bitsLeft -= bitsToWrite;
 				count -= bitsToWrite;
-				bits >>= bitsToWrite;
+				srcBits >>= bitsToWrite;
 			}
 		}
 
 	private:
-		std::vector<char>& dest;
-		size_t bitsPos;
+		char* bytes;
+		size_t bytesLeft;
+		char* bits;
 		uint8_t bitsLeft = 0;
 	};
 
@@ -304,6 +310,19 @@ namespace bw
 	template<class T> size_t byteLength(const T& x) { return (bitLength(x) + 7)/8; }
 	template<class T> void unpackFrom(const std::vector<char>& v, T& x) { Reader r(v); unpackFrom(r, x); }
 	template<class T, class B> T unpack(const B& v) { T x; unpackFrom(v, x); return x; }
-	template<class T> void packInto(std::vector<char>& v, const T& x) { Writer w(v); packInto(w, x); }
-	template<class T> std::vector<char> pack(const T& x) { std::vector<char> r; r.reserve(byteLength(x)); packInto(r, x); return r; }
+
+	template<class T> void packInto(std::vector<char>& v, const T& x)
+	{
+		v.resize(byteLength(x));
+		Writer w(v.data(), v.size());
+		packInto(w, x);
+	}
+
+	template<class T> std::vector<char> pack(const T& x)
+	{
+		std::vector<char> r(byteLength(x));
+		Writer w(r.data(), r.size());
+		packInto(w, x);
+		return r;
+	}
 }
