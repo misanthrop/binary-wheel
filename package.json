@@ -14,9 +14,7 @@
     "author": "Wheel Labs",
     "license": "MIT",
     "devDependencies": {
-        "coffee-script": "^1.7.1",
-        "mocha": "^3.5.0",
-        "nyc": "^11.1.0"
+        "coffee-script": "^1.7.1"
     },
     "dependencies": {
         "command-line-args": "^4.0.7"
