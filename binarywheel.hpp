@@ -303,7 +303,7 @@ namespace bw
 
 	template<class T> size_t byteLength(const T& x) { return (bitLength(x) + 7)/8; }
 	template<class T> void unpackFrom(const std::vector<char>& v, T& x) { Reader r(v); unpackFrom(r, x); }
-	template<class T, class B> T unpack(const B& v) { T x; unpackFrom(v, x); return x; }
+	template<class T, class B> T unpack(B& v) { T x; unpackFrom(v, x); return x; }
 	template<class T> void packInto(std::vector<char>& v, const T& x) { Writer w(v); packInto(w, x); }
 	template<class T> std::vector<char> pack(const T& x) { std::vector<char> r; r.reserve(byteLength(x)); packInto(r, x); return r; }
 }

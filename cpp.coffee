@@ -67,6 +67,7 @@ bw.Enum::typename = (hint = 'Enum') -> newName hint
 
 bw.Struct::typename = (hint = 'Struct') ->
 	for [name, type] in @members
+		throw new Error "Undefined type of #{hint}.#{name}" if not type
 		register type, capitalizeFirstLetter name
 	newName hint
 
