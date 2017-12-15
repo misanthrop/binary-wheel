@@ -107,6 +107,12 @@ namespace bw
 	template<class T> void unpackFrom(Reader& r, T& x) { Type<std::decay_t<T>>::unpackFrom(r, x); }
 	template<class T> void packInto(Writer& w, const T& x) { Type<std::decay_t<T>>::packInto(w, x); }
 
+	template<class T> size_t byteLength(const T& x) { return (bitLength(x) + 7)/8; }
+	template<class T> void unpackFrom(const std::vector<char>& v, T& x) { Reader r(v); unpackFrom(r, x); }
+	template<class T, class B> T unpack(B& v) { T x; unpackFrom(v, x); return x; }
+	template<class T> void packInto(std::vector<char>& v, const T& x) { Writer w(v); packInto(w, x); }
+	template<class T> std::vector<char> pack(const T& x) { std::vector<char> r; r.reserve(byteLength(x)); packInto(r, x); return r; }
+
 	inline float asFloat(uint32_t x) { float f; memcpy(&f, &x, sizeof(x)); return f; }
 	inline float scale(float v, float vmin, float vmax, float min, float max) { return (v - vmin)/(vmax - vmin)*(max - min) + min; }
 
@@ -154,14 +160,14 @@ namespace bw
 		static std::string toString(size_t x) { return std::to_string(x); }
 		static size_t bitLength(size_t x) { return 2 + 8*(size_t(1) << bytesBitsNeeded(x)); }
 
-		static void unpackFrom(Reader& r, size_t& x)
+		static size_t unpack(Reader& r)
 		{
 			switch(r.readBits(2))
 			{
-				case 0: { uint8_t l; bw::unpackFrom(r, l); x = l; break; }
-				case 1: { uint16_t l; bw::unpackFrom(r, l); x = l; break; }
-				case 2: { uint32_t l; bw::unpackFrom(r, l); x = l; break; }
-				case 3: { bw::unpackFrom(r, x); break; }
+				case 0: return bw::unpack<uint8_t>(r);
+				case 1: return bw::unpack<uint16_t>(r);
+				case 2: return bw::unpack<uint32_t>(r);
+				case 3: return bw::unpack<uint64_t>(r);
 			}
 		}
 
@@ -186,8 +192,7 @@ namespace bw
 
 		static void unpackFrom(Reader& r, std::string& x)
 		{
-			size_t len;
-			VarInt::unpackFrom(r, len);
+			size_t len = VarInt::unpack(r);
 			x.clear();
 			char s[1024];
 			while(len)
@@ -246,8 +251,7 @@ namespace bw
 
 		static void unpackFrom(Reader& r, std::vector<T>& x)
 		{
-			size_t len;
-			VarInt::unpackFrom(r, len);
+			size_t len = VarInt::unpack(r);
 			x.clear();
 			while(len--)
 			{
@@ -300,10 +304,4 @@ namespace bw
 		static void unpackFrom(Reader& r, T& x) { bw::unpackFrom(r, ~x); }
 		static void packInto(Writer& w, const T& x) { bw::packInto(w, ~x); }
 	};
-
-	template<class T> size_t byteLength(const T& x) { return (bitLength(x) + 7)/8; }
-	template<class T> void unpackFrom(const std::vector<char>& v, T& x) { Reader r(v); unpackFrom(r, x); }
-	template<class T, class B> T unpack(B& v) { T x; unpackFrom(v, x); return x; }
-	template<class T> void packInto(std::vector<char>& v, const T& x) { Writer w(v); packInto(w, x); }
-	template<class T> std::vector<char> pack(const T& x) { std::vector<char> r; r.reserve(byteLength(x)); packInto(r, x); return r; }
 }
