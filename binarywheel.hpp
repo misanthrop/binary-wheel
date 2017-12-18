@@ -167,8 +167,8 @@ namespace bw
 				case 0: return bw::unpack<uint8_t>(r);
 				case 1: return bw::unpack<uint16_t>(r);
 				case 2: return bw::unpack<uint32_t>(r);
-				case 3: return bw::unpack<uint64_t>(r);
 			}
+			return bw::unpack<uint64_t>(r);
 		}
 
 		static void packInto(Writer& w, size_t x)
