@@ -1,0 +1,19 @@
+#!/usr/bin/env node
+
+var program = require('commander')
+	.arguments('<file>')
+	.option('-o, --out [file]', 'optional output file path')
+	.option('-n, --namespace [string]', 'optional C++ namespace.')
+	.option('--no-coffee', 'disable CoffeeScript support')
+	.parse(process.argv)
+
+if(!program.args.length) return program.help();
+
+const path = require('path').resolve(program.args[0])
+if(program.coffee) require('coffeescript/register')
+const src = require('./cpp').generate(require(path))
+
+if(program.out)
+	require('fs').writeFileSync(program.out, src)
+else
+	process.stdout.write(src)
