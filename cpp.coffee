@@ -1,53 +1,4 @@
-path = require 'path'
 bw = require '.'
-
-options = require('command-line-args') [
-	{ name: 'src', type: String, defaultOption: true }
-	{ name: 'namespace', alias: 'n', type: String, defaultValue: '' }
-	{ name: 'out', alias: 'o', type: String, defaultValue: '' }]
-
-publicTypes = require path.resolve options.src
-allTypes = {}
-
-decls =
-	forward: []
-	other: []
-	adapters: []
-
-newName = (nameHint) ->
-	name = nameHint
-	i = 0
-	while allTypes[name]
-		name = "#{nameHint}#{i += 1}"
-	name
-
-register = (type, hint, pub = false) ->
-	type.pub or= pub or type instanceof bw.Enum
-	if not type.registered
-		type.registered = true
-		name = type.typename? hint
-		if not type.name?
-			allTypes[type.name = name] = type
-		if adapt = type.adapter?()
-			decls.adapters.push adapt
-	type.name
-
-declare = (type) -> if not type.declared and type.pub
-	type.declared = true
-	if deps = type.dependencies?()
-		for n, t of deps
-			declare t
-	decl = type.declaration?() ? (type.spec and type.name != type.spec and "using #{type.name} = #{type.spec}" or "")
-	decls[if not deps then 'forward' else 'other'].push decl
-
-capitalizeFirstLetter = (s) -> s[0].toUpperCase() + s.substring 1
-
-floatAsUint32 = (v) ->
-	view = new DataView new ArrayBuffer 4
-	view.setFloat32 0, v
-	view.getUint32 0
-
-hex = (v) -> "0x#{v.toString 16}"
 
 bw.bool.name = 'bool'
 bw.int8.name = 'int8_t'
@@ -59,86 +10,130 @@ bw.uint32.name = 'uint32_t'
 bw.float32.name = 'float'
 bw.string.name = 'std::string'
 
+capitalizeFirstLetter = (s) -> s[0].toUpperCase() + s.substring 1
+
+floatAsUint32 = (v) ->
+	view = new DataView new ArrayBuffer 4
+	view.setFloat32 0, v
+	view.getUint32 0
+
+hex = (v) -> "0x#{v.toString 16}"
+
 templateFloat = (v) -> if v then "#{hex floatAsUint32 v} /*#{v}*/" else 0
-bw.List::typename = (hint) -> @spec = "std::vector<#{register @type, hint, true}>"
-bw.Optional::typename = (hint) -> @spec = "std::optional<#{register @type, hint, true}>"
-bw.Scaled::typename = (hint = 'Scaled') -> @spec = "bw::Scaled<#{@type.name}, #{templateFloat @min}, #{templateFloat @max}>"
-bw.Enum::typename = (hint = 'Enum') -> newName hint
 
-bw.Struct::typename = (hint = 'Struct') ->
-	for [name, type] in @members
-		throw new Error "Undefined type of #{hint}.#{name}" if not type
-		register type, capitalizeFirstLetter name
-	newName hint
+generate = (publicTypes, namespace = '') ->
+	allTypes = {}
 
-bw.Struct::dependencies = ->
-	deps = {}
-	if @inStack
-		throw new Error "Circular dependency detected: #{@name}"
-	@inStack = true
-	for [name, type] in @members
-		if type.dependencies?
-			deps[type.name] = type
-			Object.assign deps, type.dependencies()
-	delete @inStack
-	deps
+	decls =
+		forward: []
+		other: []
+		adapters: []
 
-bw.Enum::declaration = -> "enum class #{@name} : uint8_t { #{@members.join ', '} }"
-bw.Enum::adapter = -> "template<> constexpr int EnumCount<#{@name}> = #{@members.length};"
+	newName = (nameHint) ->
+		name = nameHint
+		i = 0
+		while allTypes[name]
+			name = "#{nameHint}#{i += 1}"
+		name
 
-cppValue = (value) ->
-	if value instanceof Array
-		"{ #{value.map((v) -> cppValue v).join ', '} }"
-	else if value instanceof String
-		'"' + value + '"'
-	else
-		value
+	register = (type, hint, pub = false) ->
+		type.pub or= pub or type instanceof bw.Enum
+		if not type.registered
+			type.registered = true
+			name = type.typename? hint
+			if not type.name?
+				allTypes[type.name = name] = type
+			if adapt = type.adapter?()
+				decls.adapters.push adapt
+		type.name
 
-valueAssignment = (value) ->
-	if value?
-		" = #{cppValue value}"
-	else
-		""
+	declare = (type) -> if not type.declared and type.pub
+		type.declared = true
+		if deps = type.dependencies?()
+			for n, t of deps
+				declare t
+		decl = type.declaration?() ? (type.spec and type.name != type.spec and "using #{type.name} = #{type.spec}" or "")
+		decls[if not deps then 'forward' else 'other'].push decl
 
-bw.Struct::declaration = (ident = '') ->
-	members = @members.map ([name, type, value]) ->
-		"#{if type.pub or not type.declaration? then type.name else type.declaration ident + '\t'} #{name}#{valueAssignment value};"
-	params = @members.map ([name]) -> name
+	bw.List::typename = (hint) -> @spec = "std::vector<#{register @type, hint, true}>"
+	bw.Optional::typename = (hint) -> @spec = "std::optional<#{register @type, hint, true}>"
+	bw.Scaled::typename = (hint = 'Scaled') -> @spec = "bw::Scaled<#{@type.name}, #{templateFloat @min}, #{templateFloat @max}>"
+	bw.Enum::typename = (hint = 'Enum') -> newName hint
+
+	bw.Struct::typename = (hint = 'Struct') ->
+		for [name, type] in @members
+			throw new Error "Undefined type of #{hint}.#{name}" if not type
+			register type, capitalizeFirstLetter name
+		newName hint
+
+	bw.Struct::dependencies = ->
+		deps = {}
+		if @inStack
+			throw new Error "Circular dependency detected: #{@name}"
+		@inStack = true
+		for [name, type] in @members
+			if type.dependencies?
+				deps[type.name] = type
+				Object.assign deps, type.dependencies()
+		delete @inStack
+		deps
+
+	bw.Enum::declaration = -> "enum class #{@name} : uint8_t { #{@members.join ', '} }"
+	bw.Enum::adapter = -> "template<> constexpr int EnumCount<#{@name}> = #{@members.length};"
+
+	cppValue = (value) ->
+		if value instanceof Array
+			"{ #{value.map((v) -> cppValue v).join ', '} }"
+		else if value instanceof String
+			'"' + value + '"'
+		else
+			value
+
+	valueAssignment = (value) ->
+		if value?
+			" = #{cppValue value}"
+		else
+			""
+
+	bw.Struct::declaration = (ident = '') ->
+		members = @members.map ([name, type, value]) ->
+			"#{if type.pub or not type.declaration? then type.name else type.declaration ident + '\t'} #{name}#{valueAssignment value};"
+		params = @members.map ([name]) -> name
+		"""
+		struct#{if @pub then ' ' + @name else ''}
+		#{ident}{
+		#{ident}	#{members.join '\n\t' + ident}
+		#{ident}	auto operator~() const { return std::forward_as_tuple(#{params.join ', '}); }
+		#{ident}	auto operator~() { return std::forward_as_tuple(#{params.join ', '}); }
+		#{ident}}
+		"""
+
+	for name, type of publicTypes
+		allTypes[type.name = name] = type
+
+	for name, type of publicTypes
+		register type, name, true
+
+	for name, type of allTypes
+		declare type
+
+	forwardStructs = for name, type of allTypes when type.pub and type instanceof bw.Struct
+		"struct #{name}"
+
+	decls.forward = forwardStructs.concat decls.forward
+
+	for t in ['forward', 'other']
+		decls[t] = decls[t].filter (x) -> x
+
 	"""
-	struct#{if @pub then ' ' + @name else ''}
-	#{ident}{
-	#{ident}	#{members.join '\n\t' + ident}
-	#{ident}	auto operator~() const { return std::forward_as_tuple(#{params.join ', '}); }
-	#{ident}	auto operator~() { return std::forward_as_tuple(#{params.join ', '}); }
-	#{ident}}
-	"""
-
-for name, type of publicTypes
-	allTypes[type.name = name] = type
-
-for name, type of publicTypes
-	register type, name, true
-
-for name, type of allTypes
-	declare type
-
-forwardStructs = for name, type of allTypes when type.pub and type instanceof bw.Struct
-	"struct #{name}"
-
-decls.forward = forwardStructs.concat decls.forward
-
-for t in ['forward', 'other']
-	decls[t] = decls[t].filter (x) -> x
-
-resultSource = """
 	#pragma once
 	#include <binarywheel.hpp>
 
-	#{if options.namespace then 'namespace ' + options.namespace + '\n{' else ''}
+	#{if namespace then 'namespace ' + namespace + '\n{' else ''}
 	#{decls.forward.join ';\n'};
 
 	#{decls.other.join ';\n\n'};
-	#{if options.namespace then '}' else ''}
+	#{if namespace then '}' else ''}
 
 	namespace bw
 	{
@@ -147,7 +142,4 @@ resultSource = """
 
 	"""
 
-if options.out
-	require('fs').writeFileSync options.out, resultSource
-else
-	process.stdout.write resultSource
+module.exports = {generate}

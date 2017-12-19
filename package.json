@@ -2,21 +2,23 @@
     "name": "binary-wheel",
     "version": "1.0.0",
     "description": "Minimalistic structured data binary serialization library.",
-    "main": "index.coffee",
+    "main": "index.js",
+    "bin": {
+        "bw-gen-cpp": "./cpp.js"
+    },
     "repository": {
         "type": "git",
         "url": "git@github.com:misanthrop/binary-wheel.git"
     },
     "scripts": {
+        "preinstall": "coffee -c index.coffee",
         "test": "nyc --cache=false --reporter=none mocha --compilers coffee:coffee-script/register",
         "cov": "nyc report --reporter=text-lcov"
     },
     "author": "Wheel Labs",
     "license": "MIT",
-    "devDependencies": {
-        "coffee-script": "^1.7.1"
-    },
     "dependencies": {
+        "coffeescript": "^2.0.0",
         "command-line-args": "^4.0.7"
     },
     "nyc": {
