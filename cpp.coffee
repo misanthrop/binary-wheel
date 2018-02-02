@@ -79,7 +79,7 @@ generate = (publicTypes, namespace = '') ->
 		deps
 
 	bw.Enum::declaration = -> "enum class #{@name} : uint8_t { #{@members.join ', '} }"
-	bw.Enum::adapter = -> "template<> constexpr int EnumCount<#{@name}> = #{@members.length};"
+	bw.Enum::adapter = -> "template<> constexpr int EnumCount<#{namespace}::#{@name}> = #{@members.length};"
 
 	cppValue = (value) ->
 		if value instanceof Array
