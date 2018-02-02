@@ -26,7 +26,7 @@ $(out)/test: $(temp)/test.cpp.o makefile
 
 $(temp)/testtypes.hpp: testtypes.coffee ../cpp.coffee makefile
 	@mkdir -p $(@D)
-	coffee ../cpp.coffee $< > $@
+	../bw-gen-cpp $< -o $@
 
 $(out)/cpp.info: $(out)/test makefile
 	@rm -f $@

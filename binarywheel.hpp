@@ -8,12 +8,7 @@
 #include <cassert>
 #include <tuple>
 #include <vector>
-#if __cplusplus <= 201402L
-#include <experimental/optional>
-namespace std { using namespace std::experimental; }
-#else
 #include <optional>
-#endif
 
 namespace bw
 {
@@ -99,7 +94,6 @@ namespace bw
 
 	template<class T> constexpr int EnumCount = 0;
 	template<class T, class = void> struct Type;
-	template<class T> auto asTuple(T&& x) { return std::forward<T>(x); }
 
 	template<class T> std::string toString(const T& x) { return Type<std::decay_t<T>>::toString(x); }
 	template<class T> size_t bitLength(const T& x) { return Type<std::decay_t<T>>::bitLength(x); }
@@ -137,7 +131,7 @@ namespace bw
 		static void packInto(Writer& w, const bool& x) { w.writeBits(x, 1); }
 	};
 
-	template<class T> struct Type<T, std::enable_if_t<std::is_enum<T>::value, void>>
+	template<class T> struct Type<T, std::enable_if_t<std::is_enum_v<T>, void>>
 	{
 		static constexpr uint8_t bits = 32 - __builtin_clz(EnumCount<T> - 1);
 		static std::string toString(const T& x) { return std::to_string((uint8_t)x); }
@@ -146,7 +140,7 @@ namespace bw
 		static void packInto(Writer& w, const T& x) { w.writeBits((uint32_t)x, bits); }
 	};
 
-	template<class T> struct Type<T, std::enable_if_t<std::is_arithmetic<T>::value, void>>
+	template<class T> struct Type<T, std::enable_if_t<std::is_arithmetic_v<T>, void>>
 	{
 		static std::string toString(const T& x) { return std::to_string(x); }
 		static size_t bitLength(const T&) { return 8*sizeof(T); }
@@ -267,34 +261,16 @@ namespace bw
 		}
 	};
 
-	inline std::string toStringArgs() { return ""; }
-	template<class Arg, class... Args> inline std::string toStringArgs(const Arg& first, const Args&... rest) { return bw::toString(first) + ' ' + toStringArgs(rest...); }
-
-	inline size_t sumArgs() { return 0; }
-	template<class Arg, class... Args> inline size_t sumArgs(Arg first, Args... rest) { return first + sumArgs(rest...); }
-
-	inline void unpackArgs(Reader&) {}
-	template<class Arg, class... Args> inline void unpackArgs(Reader& r, Arg& first, Args&... rest) { unpackFrom(r, first); unpackArgs(r, rest...); }
-
-	inline void packArgs(Writer&) {}
-	template<class Arg, class... Args> inline void packArgs(Writer& w, const Arg& first, const Args&... rest) { packInto(w, first); packArgs(w, rest...); }
-
-	template<class T, size_t... I> std::string toStringTuple(const T& x, std::index_sequence<I...>) { return toStringArgs(std::get<I>(x)...); }
-	template<class T, size_t... I> size_t bitLengthTuple(const T& x, std::index_sequence<I...>) { return sumArgs(bitLength(std::get<I>(x))...); }
-	template<class T, size_t... I> void unpackTuple(Reader& r, T&& x, std::index_sequence<I...>) { unpackArgs(r, std::get<I>(std::forward<T>(x))...); }
-	template<class T, size_t... I> void packTuple(Writer& w, const T& x, std::index_sequence<I...>) { packArgs(w, std::get<I>(x)...); }
-
 	template<class... Args> struct Type<std::tuple<Args...>>
 	{
 		using T = std::tuple<Args...>;
-
-		static std::string toString(const T& x) { return "( " + toStringTuple(x, std::make_index_sequence<std::tuple_size<T>::value>()) + ')'; }
-		static size_t bitLength(const T& x) { return bitLengthTuple(x, std::make_index_sequence<std::tuple_size<T>::value>()); }
-		static void unpackFrom(Reader& r, T&& x) { unpackTuple(r, std::forward<T>(x), std::make_index_sequence<std::tuple_size<T>::value>()); }
-		static void packInto(Writer& w, const T& x) { packTuple(w, x, std::make_index_sequence<std::tuple_size<T>::value>()); }
+		static std::string toString(const T& x) { return std::apply([](const auto&... args) { return "( " + ((bw::toString(args) + ' ') + ...) + ')'; }, x); }
+		static size_t bitLength(const T& x) { return std::apply([](const auto&... args) { return (bw::bitLength(args) + ...); }, x); }
+		static void unpackFrom(Reader& r, T&& x) { std::apply([&](auto&&... args) { (bw::unpackFrom(r, args), ...); }, std::forward<T>(x)); }
+		static void packInto(Writer& w, const T& x) { std::apply([&](const auto&... args) { (bw::packInto(w, args), ...); }, x); }
 	};
 
-	template<class T> struct Type<T, std::enable_if_t<std::is_class<T>::value
+	template<class T> struct Type<T, std::enable_if_t<std::is_class_v<T>
 		&& !is_same_template<std::optional, T>
 		&& !is_same_template<std::vector, T>
 		&& !is_same_template<std::tuple, T>, void>>
