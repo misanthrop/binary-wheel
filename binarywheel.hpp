@@ -13,11 +13,11 @@
 
 namespace bw
 {
-	template<template<class...> class TT, class X> constexpr bool is_same_template = false;
-	template<template<class...> class TT, class... P> constexpr bool is_same_template<TT, TT<P...>> = true;
+	template<template<typename...> typename TT, typename X> constexpr bool is_same_template = false;
+	template<template<typename...> typename TT, typename... P> constexpr bool is_same_template<TT, TT<P...>> = true;
 
-	template<class T> constexpr int EnumCount = 0;
-	template<class T, class = void> struct Type;
+	template<typename T> constexpr int EnumCount = 0;
+	template<typename T, typename = void> struct Type;
 
 	struct Reader
 	{
@@ -55,7 +55,7 @@ namespace bw
 			return result;
 		}
 
-		template<class T> auto unpack() { return Type<std::decay_t<T>>::unpack(*this); }
+		template<typename T> auto unpack() { return Type<std::decay_t<T>>::unpack(*this); }
 
 	private:
 		const char* from;
@@ -98,33 +98,21 @@ namespace bw
 		uint8_t bitsLeft = 0;
 	};
 
-	template<class T> std::string toString(const T& x) { return Type<std::decay_t<T>>::toString(x); }
+	template<typename T> std::string toString(const T& x) { return Type<std::decay_t<T>>::toString(x); }
 
 	template<size_t Max> constexpr uint8_t bitsNeeded = 32 - __builtin_clz(Max);
 
-	template<class T> constexpr size_t bitLength(const T& x)
-	{
-		if constexpr(std::is_same_v<T, bool>)
-			return 1;
-		else if constexpr(std::is_enum_v<T>)
-			return bitsNeeded<EnumCount<T> - 1>;
-		else if constexpr(std::is_arithmetic_v<T>)
-			return 8*sizeof(T);
-		else if constexpr(is_same_template<std::optional, T>)
-			return 1 + (x ? bw::bitLength(*x) : 0);
-		else return Type<std::decay_t<T>>::bitLength(x);
-	}
+	template<typename T> constexpr size_t bitLength(const T& x) { return Type<std::decay_t<T>>::bitLength(x); }
+	template<typename T> void packInto(Writer& w, const T& x) { Type<std::decay_t<T>>::packInto(w, x); }
 
-	template<class T> void packInto(Writer& w, const T& x) { Type<std::decay_t<T>>::packInto(w, x); }
-
-	template<class T> size_t byteLength(const T& x) { return (bitLength(x) + 7)/8; }
-	template<class T> void packInto(std::vector<char>& v, const T& x) { Writer w(v); packInto(w, x); }
-	template<class T> std::vector<char> pack(const T& x) { std::vector<char> r; r.reserve(byteLength(x)); packInto(r, x); return r; }
+	template<typename T> size_t byteLength(const T& x) { return (bitLength(x) + 7)/8; }
+	template<typename T> void packInto(std::vector<char>& v, const T& x) { Writer w(v); packInto(w, x); }
+	template<typename T> std::vector<char> pack(const T& x) { std::vector<char> r; r.reserve(byteLength(x)); packInto(r, x); return r; }
 
 	inline float asFloat(uint32_t x) { float f; memcpy(&f, &x, sizeof(x)); return f; }
 	inline float scale(float v, float vmin, float vmax, float min, float max) { return (v - vmin)/(vmax - vmin)*(max - min) + min; }
 
-	template<class U, uint32_t Min, uint32_t Max> struct Scaled
+	template<typename U, uint32_t Min, uint32_t Max> struct Scaled
 	{
 		U value;
 		Scaled() {}
@@ -140,26 +128,29 @@ namespace bw
 	template<> struct Type<bool>
 	{
 		static std::string toString(const bool& x) { return x ? "+" : "-"; }
+		static constexpr size_t bitLength(const bool&) { return 1; }
 		static bool unpack(Reader& r) { return r.readBits(1); }
 		static void packInto(Writer& w, const bool& x) { w.writeBits(x, 1); }
 	};
 
-	template<class T> struct Type<T, std::enable_if_t<std::is_enum_v<T>, void>>
+	template<typename T> struct Type<T, std::enable_if_t<std::is_enum_v<T>, void>>
 	{
 		static constexpr uint8_t bits = bitsNeeded<EnumCount<T> - 1>;
 		static std::string toString(const T& x) { return std::to_string((uint8_t)x); }
+		static constexpr size_t bitLength(const T&) { return bits; }
 		static T unpack(Reader& r) { return (T)r.readBits(bits); }
 		static void packInto(Writer& w, const T& x) { w.writeBits((uint32_t)x, bits); }
 	};
 
-	template<class T> struct Type<T, std::enable_if_t<std::is_arithmetic_v<T>, void>>
+	template<typename T> struct Type<T, std::enable_if_t<std::is_arithmetic_v<T>, void>>
 	{
 		static std::string toString(const T& x) { return std::to_string(x); }
+		static constexpr size_t bitLength(const T&) { return 8*sizeof(T); }
 		static T unpack(Reader& r) { T x; r.read(&x, sizeof(T)); return x; }
 		static void packInto(Writer& w, const T& x) { w.write(&x, sizeof(T)); }
 	};
 
-	template<class... Args> struct Type<std::variant<Args...>>
+	template<typename... Args> struct Type<std::variant<Args...>>
 	{
 		using T = std::variant<std::decay_t<Args>...>;
 		static constexpr uint8_t bits = bitsNeeded<std::variant_size_v<T> - 1>;
@@ -225,10 +216,12 @@ namespace bw
 		}
 	};
 
-	template<class T> struct Type<std::optional<T>>
+	template<typename T> struct Type<std::optional<T>>
 	{
 		static std::string toString(const std::optional<T>& x) { return x ? bw::toString(*x) : "?"; }
+		static constexpr size_t bitLength(const std::optional<T>& x) { return 1 + (x ? bw::bitLength(*x) : 0); }
 		static std::optional<T> unpack(Reader& r) { return r.readBits(1) ? std::optional(r.unpack<T>()) : std::nullopt; }
+
 		static void packInto(Writer& w, const std::optional<T>& x)
 		{
 			w.writeBits(bool(x), 1);
@@ -236,7 +229,7 @@ namespace bw
 		}
 	};
 
-	template<class T> struct Type<std::vector<T>>
+	template<typename T> struct Type<std::vector<T>>
 	{
 		static std::string toString(const std::vector<T>& x)
 		{
@@ -267,7 +260,7 @@ namespace bw
 		}
 	};
 
-	template<class... Args> struct Type<std::tuple<Args...>>
+	template<typename... Args> struct Type<std::tuple<Args...>>
 	{
 		using T = std::tuple<std::decay_t<Args>...>;
 		static std::string toString(const T& x) { return std::apply([](const auto&... args) { return "( " + ((bw::toString(args) + ' ') + ...) + ')'; }, x); }
@@ -276,7 +269,7 @@ namespace bw
 		static void packInto(Writer& w, const T& x) { std::apply([&](const auto&... args) { (bw::packInto(w, args), ...); }, x); }
 	};
 
-	template<class T> struct Type<T, std::enable_if_t<std::is_class_v<T>
+	template<typename T> struct Type<T, std::enable_if_t<std::is_class_v<T>
 		&& !is_same_template<std::optional, T>
 		&& !is_same_template<std::vector, T>
 		&& !is_same_template<std::tuple, T>

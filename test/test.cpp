@@ -45,7 +45,7 @@ const vector<EnumStruct> e1 = {
 const vector<uint8_t> e1ub = {116,3,7,64,139};
 const vector<char> e1b(e1ub.begin(), e1ub.end());
 
-const NumStruct n1 = { -12400, 49312, -1230340234, 4012321632, 0.6, 0.31999694819562063 };
+const NumStruct n1 = {-12400, 49312, -1230340234, 4012321632, 0.6, 0.31999694819562063};
 const vector<uint8_t> n1ub = {144,207,160,192,118,127,170,182,96,43,39,239,153,235,81};
 const vector<char> n1b(n1ub.begin(), n1ub.end());
 
