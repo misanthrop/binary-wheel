@@ -49,6 +49,8 @@ const NumStruct n1 = { -12400, 49312, -1230340234, 4012321632, 0.6, 0.3199969481
 const vector<uint8_t> n1ub = {144,207,160,192,118,127,170,182,96,43,39,239,153,235,81};
 const vector<char> n1b(n1ub.begin(), n1ub.end());
 
+const variant<uint8_t, float> var0 = 2.3f;
+
 const lest::test tests[] =
 {
 	CASE("empty")
@@ -71,6 +73,11 @@ const lest::test tests[] =
 		EXPECT(bw::byteLength(n1) == n1b.size());
 		EXPECT(bw::pack(n1) == n1b);
 		EXPECT(bw::Reader(n1b).unpack<NumStruct>() == n1);
+	},
+
+	CASE("variant")
+	{
+		EXPECT(bw::bitLength(var0) == 4*8 + 1);
 	},
 
 	CASE("complex")
