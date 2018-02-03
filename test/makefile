@@ -18,7 +18,7 @@ clean:
 
 $(temp)/%.cpp.o: %.cpp $(temp)/testtypes.hpp makefile
 	@mkdir -p $(@D)
-	$(CXX) -MMD -MP -MF $@.d $(cov) -I.. -I$(temp) -c $< -o $@
+	$(CXX) -MMD -MP -MF $@.d -g $(cov) -I.. -I$(temp) -c $< -o $@
 
 $(out)/test: $(temp)/test.cpp.o makefile
 	@mkdir -p $(@D)

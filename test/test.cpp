@@ -56,21 +56,21 @@ const lest::test tests[] =
 		EXPECT(bw::toString(t0) == t0s);
 		EXPECT(bw::byteLength(t0) == t0b.size());
 		EXPECT(bw::pack(t0) == t0b);
-		EXPECT(bw::unpack<TestStruct>(t0b) == t0);
+		EXPECT(bw::Reader(t0b).unpack<TestStruct>() == t0);
 	},
 
 	CASE("enums")
 	{
 		EXPECT(bw::byteLength(e1) == e1b.size());
 		EXPECT(bw::pack(e1) == e1b);
-		EXPECT(bw::unpack<vector<EnumStruct>>(e1b) == e1);
+		EXPECT(bw::Reader(e1b).unpack<vector<EnumStruct>>() == e1);
 	},
 
 	CASE("numbers")
 	{
 		EXPECT(bw::byteLength(n1) == n1b.size());
 		EXPECT(bw::pack(n1) == n1b);
-		EXPECT(bw::unpack<NumStruct>(n1b) == n1);
+		EXPECT(bw::Reader(n1b).unpack<NumStruct>() == n1);
 	},
 
 	CASE("complex")
@@ -78,16 +78,13 @@ const lest::test tests[] =
 		EXPECT(bw::toString(t1) == t1s);
 		EXPECT(bw::byteLength(t1) == t1b.size());
 		EXPECT(bw::pack(t1) == t1b);
-		EXPECT(bw::unpack<TestStruct>(t1b) == t1);
+		EXPECT(bw::Reader(t1b).unpack<TestStruct>() == t1);
 	},
 
 	CASE("other")
 	{
-		TestStruct x;
-		bw::unpackFrom(bw::pack(t0), x);
-		EXPECT(x == t0);
-		bw::unpackFrom(bw::pack(t1), x);
-		EXPECT(x == t1);
+		EXPECT(bw::Reader(bw::pack(t0)).unpack<TestStruct>() == t0);
+		EXPECT(bw::Reader(bw::pack(t1)).unpack<TestStruct>() == t1);
 	}
 };
 
