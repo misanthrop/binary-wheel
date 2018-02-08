@@ -12,7 +12,7 @@
     },
     "scripts": {
         "preinstall": "coffee -c *.coffee",
-        "test": "nyc --cache=false --reporter=none mocha --compilers coffee:coffee-script/register",
+		"test": "nyc --cache=false --reporter=none mocha --compilers coffee:coffeescript/register",
         "cov": "nyc report --reporter=text-lcov"
     },
     "author": "Wheel Labs",

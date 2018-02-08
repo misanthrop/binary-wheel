@@ -2,13 +2,13 @@ bw = require '..'
 
 Enum = bw.enum ['A', 'B', 'C', 'D', 'E']
 
-Nested = bw.struct [
-	['name', bw.string]
-	['x', bw.uint8]
-	['v', bw.optional bw.string]
-	['a', bw.bool]
-	['b', bw.bool]
-	['c', bw.bool]]
+Nested = bw.struct
+	name: bw.string
+	x: bw.uint8
+	v: bw.optional bw.string
+	a: bw.bool
+	b: bw.bool
+	c: bw.bool
 
 TestStruct = bw.struct [
 	['a', bw.list Nested]
@@ -41,4 +41,7 @@ EnumStruct = bw.struct [
 
 EnumList = bw.list EnumStruct
 
-module.exports = { Enum, Nested, TestStruct, NumStruct, EnumStruct, EnumList }
+VariantList = bw.list bw.variant [bw.int8, bw.int32, bw.float32, bw.string]
+
+module.exports = {
+	Enum, Nested, TestStruct, NumStruct, EnumStruct, EnumList, VariantList}
