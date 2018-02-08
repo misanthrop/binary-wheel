@@ -13,9 +13,6 @@
 
 namespace bw
 {
-	template<template<typename...> typename TT, typename X> constexpr bool is_same_template = false;
-	template<template<typename...> typename TT, typename... P> constexpr bool is_same_template<TT, TT<P...>> = true;
-
 	template<typename T> constexpr int EnumCount = 0;
 	template<typename T, typename = void> struct Type;
 
@@ -92,22 +89,27 @@ namespace bw
 			}
 		}
 
+		template<typename T> void pack(const T& x) { Type<std::decay_t<T>>::packInto(*this, x); }
+
 	private:
 		std::vector<char>& dest;
 		size_t bitsPos;
 		uint8_t bitsLeft = 0;
 	};
 
+	constexpr uint8_t bitsNeeded(size_t max) { return 32 - __builtin_clz(max); }
 	template<typename T> std::string toString(const T& x) { return Type<std::decay_t<T>>::toString(x); }
-
-	template<size_t Max> constexpr uint8_t bitsNeeded = 32 - __builtin_clz(Max);
-
 	template<typename T> constexpr size_t bitLength(const T& x) { return Type<std::decay_t<T>>::bitLength(x); }
-	template<typename T> void packInto(Writer& w, const T& x) { Type<std::decay_t<T>>::packInto(w, x); }
+	template<typename T> constexpr size_t byteLength(const T& x) { return (bitLength(x) + 7)/8; }
+	template<typename T> T unpack(const std::vector<char>& buf) { return Reader(buf).unpack<T>(); }
 
-	template<typename T> size_t byteLength(const T& x) { return (bitLength(x) + 7)/8; }
-	template<typename T> void packInto(std::vector<char>& v, const T& x) { Writer w(v); packInto(w, x); }
-	template<typename T> std::vector<char> pack(const T& x) { std::vector<char> r; r.reserve(byteLength(x)); packInto(r, x); return r; }
+	template<typename T> std::vector<char> pack(const T& x)
+	{
+		std::vector<char> r;
+		r.reserve(byteLength(x));
+		Writer(r).pack(x);
+		return r;
+	}
 
 	inline float asFloat(uint32_t x) { float f; memcpy(&f, &x, sizeof(x)); return f; }
 	inline float scale(float v, float vmin, float vmax, float min, float max) { return (v - vmin)/(vmax - vmin)*(max - min) + min; }
@@ -117,12 +119,28 @@ namespace bw
 		U value;
 		Scaled() {}
 		Scaled(float v) { *this = v; }
+		explicit Scaled(U value) : value(value) {}
 		static float min() { return asFloat(Min); }
 		static float max() { return asFloat(Max); }
 		operator float() const { return scale(value, std::numeric_limits<U>::min(), std::numeric_limits<U>::max(), min(), max()); }
 		auto& operator=(float v) { value = scale(v, min(), max(), std::numeric_limits<U>::min(), std::numeric_limits<U>::max()); return *this; }
-		U operator~() const { return value; }
-		U& operator~() { return value; }
+	};
+
+	template<typename T, typename> struct Type
+	{
+		static std::string toString(const T& x) { return bw::toString(~x); }
+		static constexpr size_t bitLength(const T& x) { return bw::bitLength(~x); }
+		static T unpack(Reader& r) { return Type<decltype(~std::declval<T>())>::template unpackAs<T>(r); }
+		static void packInto(Writer& w, const T& x) { w.pack(~x); }
+	};
+
+	template<typename U, uint32_t Min, uint32_t Max> struct Type<Scaled<U, Min, Max>>
+	{
+		using T = Scaled<U, Min, Max>;
+		static std::string toString(const T& x) { return std::to_string((float)x); }
+		static constexpr size_t bitLength(const T& x) { return bw::bitLength(x.value); }
+		static T unpack(Reader& r) { return T(r.unpack<U>()); }
+		static void packInto(Writer& w, const T& x) { w.pack<U>(x.value); }
 	};
 
 	template<> struct Type<bool>
@@ -135,7 +153,7 @@ namespace bw
 
 	template<typename T> struct Type<T, std::enable_if_t<std::is_enum_v<T>, void>>
 	{
-		static constexpr uint8_t bits = bitsNeeded<EnumCount<T> - 1>;
+		static constexpr uint8_t bits = bitsNeeded(EnumCount<T> - 1);
 		static std::string toString(const T& x) { return std::to_string((uint8_t)x); }
 		static constexpr size_t bitLength(const T&) { return bits; }
 		static T unpack(Reader& r) { return (T)r.readBits(bits); }
@@ -153,7 +171,7 @@ namespace bw
 	template<typename... Args> struct Type<std::variant<Args...>>
 	{
 		using T = std::variant<std::decay_t<Args>...>;
-		static constexpr uint8_t bits = bitsNeeded<std::variant_size_v<T> - 1>;
+		static constexpr uint8_t bits = bitsNeeded(std::variant_size_v<T> - 1);
 
 		static std::string toString(const T& x) { return std::visit([](auto&& v) { return bw::toString(v); }, x); }
 		static size_t bitLength(const T& x) { return bits + std::visit([](auto&& v) { return bw::bitLength(v); }, x); }
@@ -171,20 +189,20 @@ namespace bw
 		static void packInto(Writer& w, const T& x)
 		{
 			w.writeBits(x.index(), bits);
-			std::visit([&](const auto& v) { bw::packInto(w, v); }, x);
+			std::visit([&](const auto& v) { w.pack(v); }, x);
 		}
 	};
 
-	using varint = std::variant<uint8_t, uint16_t, uint32_t, uint64_t>;
+	using VarInt = std::variant<uint8_t, uint16_t, uint32_t, uint64_t>;
 
-	inline constexpr varint toVarInt(size_t v)
+	inline constexpr VarInt toVarInt(size_t v)
 	{
 		return v <= 0xffff
-			? (v <= 0xff ? varint(uint8_t(v)) : varint(uint16_t(v)))
-			: (v <= 0xffffffff ? varint(uint32_t(v)) : varint(uint64_t(v)));
+			? (v <= 0xff ? VarInt(uint8_t(v)) : VarInt(uint16_t(v)))
+			: (v <= 0xffffffff ? VarInt(uint32_t(v)) : VarInt(uint64_t(v)));
 	}
 
-	inline constexpr size_t fromVarInt(const varint& x)
+	inline constexpr size_t fromVarInt(const VarInt& x)
 	{
 		return std::visit([](const auto& v) { return (size_t)v; }, x);
 	}
@@ -196,7 +214,7 @@ namespace bw
 
 		static std::string unpack(Reader& r)
 		{
-			size_t len = fromVarInt(r.unpack<varint>());
+			size_t len = fromVarInt(r.unpack<VarInt>());
 			std::string x;
 			char s[1024];
 			while(len)
@@ -211,7 +229,7 @@ namespace bw
 
 		static void packInto(Writer& w, const std::string& x)
 		{
-			bw::packInto(w, toVarInt(x.size()));
+			w.pack(toVarInt(x.size()));
 			w.write(x.data(), x.size());
 		}
 	};
@@ -225,7 +243,7 @@ namespace bw
 		static void packInto(Writer& w, const std::optional<T>& x)
 		{
 			w.writeBits(bool(x), 1);
-			if(x) bw::packInto(w, *x);
+			if(x) w.pack(*x);
 		}
 	};
 
@@ -247,7 +265,7 @@ namespace bw
 
 		static std::vector<T> unpack(Reader& r)
 		{
-			size_t len = fromVarInt(r.unpack<varint>());
+			size_t len = fromVarInt(r.unpack<VarInt>());
 			std::vector<T> x;
 			while(len--) x.push_back(r.unpack<T>());
 			return x;
@@ -255,29 +273,17 @@ namespace bw
 
 		static void packInto(Writer& w, const std::vector<T>& x)
 		{
-			bw::packInto(w, toVarInt(x.size()));
-			for(const auto& v : x) bw::packInto(w, v);
+			w.pack(toVarInt(x.size()));
+			for(const auto& v : x) w.pack(v);
 		}
 	};
 
 	template<typename... Args> struct Type<std::tuple<Args...>>
 	{
-		using T = std::tuple<std::decay_t<Args>...>;
-		static std::string toString(const T& x) { return std::apply([](const auto&... args) { return "( " + ((bw::toString(args) + ' ') + ...) + ')'; }, x); }
-		static constexpr size_t bitLength(const T& x) { return std::apply([](const auto&... args) { return (bw::bitLength(args) + ...); }, x); }
-		static T unpack(Reader& r) { return {r.unpack<Args>()...}; }
-		static void packInto(Writer& w, const T& x) { std::apply([&](const auto&... args) { (bw::packInto(w, args), ...); }, x); }
-	};
-
-	template<typename T> struct Type<T, std::enable_if_t<std::is_class_v<T>
-		&& !is_same_template<std::optional, T>
-		&& !is_same_template<std::vector, T>
-		&& !is_same_template<std::tuple, T>
-		&& !is_same_template<std::variant, T>, void>>
-	{
-		static std::string toString(const T& x) { return bw::toString(~x); }
-		static constexpr size_t bitLength(const T& x) { return bw::bitLength(~x); }
-		static T unpack(Reader& r) { T x; ~x = r.unpack<decltype(~x)>(); return x; }
-		static void packInto(Writer& w, const T& x) { bw::packInto(w, ~x); }
+		static std::string toString(const std::tuple<Args...>& x) { return std::apply([](const auto&... args) { return "( " + ((bw::toString(args) + ' ') + ...) + ')'; }, x); }
+		static constexpr size_t bitLength(const std::tuple<Args...>& x) { return std::apply([](const auto&... args) { return (bw::bitLength(args) + ...); }, x); }
+		template<typename T> static T unpackAs(Reader& r) { return T{r.unpack<Args>()...}; }
+		static auto unpack(Reader& r) { return unpackAs<std::tuple<std::decay_t<Args>...>>(r); }
+		static void packInto(Writer& w, const std::tuple<Args...>& x) { std::apply([&](const auto&... args) { (w.pack(args), ...); }, x); }
 	};
 }

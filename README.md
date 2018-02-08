@@ -8,10 +8,10 @@ bw = require 'binary-wheel'
 
 Emotion = bw.enum ['Smile', 'Sad', 'Evil']
 
-Message = bw.struct [
-  ['nickname', bw.string]
-  ['message', bw.string]
-  ['emotion', bw.optional Emotion]]
+Message = bw.struct
+  nickname: bw.string
+  message: bw.string
+  emotion: bw.optional Emotion
 
 # pack binary data
 buffer = Message.pack
@@ -36,10 +36,11 @@ scaled          | 8 or 16 or 32
 enum            | 1 .. 32
 varint          | 2 + (8 or 16 or 32)
 optional T      | 1 + (0 or sizeof T)
+variant A, B, C | 1 .. 32 + (sizeof A or sizeof B or sizeof C)
 string          | sizeof varint + length*8
 list T          | sizeof varint + length*sizeof T
 struct          | sum sizeof members
 
-## Generate C++14
+## Generate C++17
 
-`coffee binary-wheel/cpp.coffee types.coffee`
+`bw-gen-cpp types.coffee`

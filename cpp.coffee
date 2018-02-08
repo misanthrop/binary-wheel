@@ -57,6 +57,7 @@ generate = (publicTypes, namespace = '') ->
 
 	bw.List::typename = (hint) -> @spec = "std::vector<#{register @type, hint, true}>"
 	bw.Optional::typename = (hint) -> @spec = "std::optional<#{register @type, hint, true}>"
+	bw.Variant::typename = (hint) -> @spec = "std::variant<#{(register type, hint, true for type in @types).join ', '}>"
 	bw.Scaled::typename = (hint = 'Scaled') -> @spec = "bw::Scaled<#{@type.name}, #{templateFloat @min}, #{templateFloat @max}>"
 	bw.Enum::typename = (hint = 'Enum') -> newName hint
 
