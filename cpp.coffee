@@ -84,7 +84,7 @@ generate = (publicTypes, namespace = '') ->
 	cppValue = (value) ->
 		if value instanceof Array
 			"{ #{value.map((v) -> cppValue v).join ', '} }"
-		else if value instanceof String
+		else if typeof value == 'string'
 			'"' + value + '"'
 		else
 			value
