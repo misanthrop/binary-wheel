@@ -41,7 +41,5 @@ EnumStruct = bw.struct [
 
 EnumList = bw.list EnumStruct
 
-VariantList = bw.list bw.variant [bw.int8, bw.int32, bw.float32, bw.string]
-
 module.exports = {
-	Enum, Nested, TestStruct, NumStruct, EnumStruct, EnumList, VariantList}
+	Enum, Nested, TestStruct, NumStruct, EnumStruct, EnumList}

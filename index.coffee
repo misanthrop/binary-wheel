@@ -148,25 +148,6 @@ class Enum extends Type
 		else
 			throw new Error "Unknown enum value #{v}"
 
-class Variant extends Type
-	constructor: (@types) ->
-		super()
-		@bits = bitsNeeded @types.length - 1
-	typeIndex: (type) ->
-		i = @types.indexOf type
-		if i == -1
-			throw new Error "Wrong variant type"
-		i
-	bitLength: (v) -> @bits + @types[@typeIndex v.type].bitLength v.value
-	unpackFrom: (r) ->
-		i = r.readBits @bits
-		type: @types[i]
-		value: @types[i].unpackFrom r
-	packInto: (w, v) ->
-		i = @typeIndex v.type
-		w.writeBits i, @bits
-		@types[i].packInto w, v.value
-
 class Optional extends Type
 	constructor: (@type) -> super()
 	bitLength: (v) -> if v? then 1 + @type.bitLength v else 1
@@ -221,14 +202,12 @@ module.exports =
 	scaled: (type, min, max) -> new Scaled type, min, max
 	enum: (members) -> new Enum members
 	optional: (type) -> new Optional type
-	variant: (types) -> new Variant types
 	list: (type) -> new List type
 	struct: (members) -> new Struct if members instanceof Array then members else for key, value of members
 		if value instanceof Array then [key, value[0], value[1]] else [key, value]
 	Scaled: Scaled
 	Enum: Enum
 	Optional: Optional
-	Variant: Variant
 	List: List
 	Struct: Struct
 	Reader: Reader

@@ -31,13 +31,6 @@ data =
 			{e1: 'N', e2: 'A', e3: 'A', e4: 'A' }
 			{e1: 'Y', e2: 'C', e3: 'F', e4: 'I' }]
 		bytes: new Uint8Array([116,3,7,64,139]).buffer
-	variants:
-		type: tt.VariantList
-		value: [
-			{type: bw.int8, value: 123}
-			{type: bw.float32, value: -25.5}
-			{type: bw.string, value: 'Variant String'}]
-		bytes: new Uint8Array([224,3,123,0,0,204,193,0,14,86,97,114,105,97,110,116,32,83,116,114,105,110,103]).buffer
 
 assertBuffersEqual = (a, b) ->
 	a = Array.prototype.slice.call new Uint8Array a
@@ -56,11 +49,3 @@ describe 'errors', ->
 			tt.TestStruct.pack
 				a: [], b0: true, o1: 1, s: '', b3: true, u: 1, o4: 'F', i: -10, b5: false, o6: [], f: 1.5
 			, Error, 'Unknown enum value F'
-	it 'wrong variant type', ->
-		assert.throws ->
-			tt.VariantList.bitLength [{type: bw.uint8, value: 0}]
-			, Error, 'Wrong variant type'
-		assert.throws ->
-			w = new Writer 32
-			tt.VariantList.packInto w, [{type: bw.int16, value: 0}]
-			, Error, 'Wrong variant type'

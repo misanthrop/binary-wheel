@@ -168,53 +168,44 @@ namespace bw
 		static void packInto(Writer& w, const T& x) { w.write(&x, sizeof(T)); }
 	};
 
-	template<typename... Args> struct Type<std::variant<Args...>>
+	namespace varint
 	{
-		using T = std::variant<std::decay_t<Args>...>;
-		static constexpr uint8_t bits = bitsNeeded(std::variant_size_v<T> - 1);
+		static constexpr uint8_t bytesBitsNeeded(size_t v) { return v <= 0xffff ? (v <= 0xff ? 0 : 1) : (v <= 0xffffffff ? 2 : 3); }
+		static constexpr size_t bitLength(size_t x) { return 2 + 8*(size_t(1) << bytesBitsNeeded(x)); }
 
-		static std::string toString(const T& x) { return std::visit([](auto&& v) { return bw::toString(v); }, x); }
-		static size_t bitLength(const T& x) { return bits + std::visit([](auto&& v) { return bw::bitLength(v); }, x); }
-
-		template<size_t I = 0> static T unpackByType(Reader& r, size_t type)
+		static size_t unpack(Reader& r)
 		{
-			if constexpr (I < std::variant_size_v<T>)
-				return I != type ? unpackByType<I + 1>(r, type) :
-					T(r.unpack<std::variant_alternative_t<I, T>>());
-			assert(false);
+			switch(r.readBits(2))
+			{
+				case 0: return r.unpack<uint8_t>();
+				case 1: return r.unpack<uint16_t>();
+				case 2: return r.unpack<uint32_t>();
+			}
+			return r.unpack<uint64_t>();
 		}
 
-		static T unpack(Reader& r) { return unpackByType<>(r, r.readBits(bits)); }
-
-		static void packInto(Writer& w, const T& x)
+		static void packInto(Writer& w, size_t x)
 		{
-			w.writeBits(x.index(), bits);
-			std::visit([&](const auto& v) { w.pack(v); }, x);
+			uint8_t bb = bytesBitsNeeded(x);
+			w.writeBits(bb, 2);
+			switch(bb)
+			{
+				case 0: return Type<uint8_t>::packInto(w, x);
+				case 1: return Type<uint16_t>::packInto(w, x);
+				case 2: return Type<uint32_t>::packInto(w, x);
+				case 3: return Type<uint64_t>::packInto(w, x);
+			}
 		}
 	};
-
-	using VarInt = std::variant<uint8_t, uint16_t, uint32_t, uint64_t>;
-
-	inline constexpr VarInt toVarInt(size_t v)
-	{
-		return v <= 0xffff
-			? (v <= 0xff ? VarInt(uint8_t(v)) : VarInt(uint16_t(v)))
-			: (v <= 0xffffffff ? VarInt(uint32_t(v)) : VarInt(uint64_t(v)));
-	}
-
-	inline constexpr size_t fromVarInt(const VarInt& x)
-	{
-		return std::visit([](const auto& v) { return (size_t)v; }, x);
-	}
 
 	template<> struct Type<std::string>
 	{
 		static std::string toString(const std::string& x) { return '\'' + x + '\''; }
-		static size_t bitLength(const std::string& x) { return bw::bitLength(toVarInt(x.size())) + 8*x.size(); }
+		static size_t bitLength(const std::string& x) { return varint::bitLength(x.size()) + 8*x.size(); }
 
 		static std::string unpack(Reader& r)
 		{
-			size_t len = fromVarInt(r.unpack<VarInt>());
+			size_t len = varint::unpack(r);
 			std::string x;
 			char s[1024];
 			while(len)
@@ -229,7 +220,7 @@ namespace bw
 
 		static void packInto(Writer& w, const std::string& x)
 		{
-			w.pack(toVarInt(x.size()));
+			varint::packInto(w, x.size());
 			w.write(x.data(), x.size());
 		}
 	};
@@ -258,14 +249,14 @@ namespace bw
 
 		static size_t bitLength(const std::vector<T>& x)
 		{
-			size_t s = bw::bitLength(toVarInt(x.size()));
+			size_t s = varint::bitLength(x.size());
 			for(const T& m : x) s += bw::bitLength(m);
 			return s;
 		}
 
 		static std::vector<T> unpack(Reader& r)
 		{
-			size_t len = fromVarInt(r.unpack<VarInt>());
+			size_t len = varint::unpack(r);
 			std::vector<T> x;
 			while(len--) x.push_back(r.unpack<T>());
 			return x;
@@ -273,7 +264,7 @@ namespace bw
 
 		static void packInto(Writer& w, const std::vector<T>& x)
 		{
-			w.pack(toVarInt(x.size()));
+			varint::packInto(w, x.size());
 			for(const auto& v : x) w.pack(v);
 		}
 	};
