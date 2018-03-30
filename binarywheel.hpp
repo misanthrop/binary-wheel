@@ -19,6 +19,7 @@ namespace bw
 	struct Reader
 	{
 		Reader(const char* from, const char* to) : from(from), to(to) {}
+		Reader(std::string_view src) : from(src.data()), to(src.data() + src.size()) {}
 		Reader(const std::vector<char>& src) : from(src.data()), to(src.data() + src.size()) {}
 
 		size_t size() const { return to - from; }
