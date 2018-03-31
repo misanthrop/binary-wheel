@@ -142,4 +142,14 @@ generate = (publicTypes, namespace = '') ->
 
 	"""
 
-module.exports = {generate}
+run = (src, out, namespace) ->
+	result = generate require(require('path').resolve src), namespace
+	if out
+		require('fs').writeFileSync out, result
+	else
+		process.stdout.write result
+
+module.exports = {generate, run}
+
+if require.main == module
+	run process.argv[2], process.argv[3], process.argv[4]
