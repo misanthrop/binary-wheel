@@ -230,7 +230,7 @@ namespace bw
 	{
 		static std::string toString(const std::optional<T>& x) { return x ? bw::toString(*x) : "?"; }
 		static constexpr size_t bitLength(const std::optional<T>& x) { return 1 + (x ? bw::bitLength(*x) : 0); }
-		static std::optional<T> unpack(Reader& r) { return r.readBits(1) ? std::optional(r.unpack<T>()) : std::nullopt; }
+		static std::optional<T> unpack(Reader& r) { return r.readBits(1) ? std::make_optional(r.unpack<T>()) : std::nullopt; }
 
 		static void packInto(Writer& w, const std::optional<T>& x)
 		{
