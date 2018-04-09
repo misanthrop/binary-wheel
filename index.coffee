@@ -88,6 +88,7 @@ class Type
 
 class Primitive extends Type
 	constructor: (@t, @bits, @min, @max) -> super(); @t += @bits
+	create: -> 0
 	bitLength: -> @bits
 	unpackFrom: (r) -> r[@t]()
 	packInto: (w, v) -> w[@t] v
@@ -115,6 +116,7 @@ varint = new VarInt ['i8', 'i16', 'i32']
 varuint = new VarInt ['u8', 'u16', 'u32']
 
 class Utf8String extends Type
+	create: -> ''
 	bitLength: (v) ->
 		l = stringToUtf8(v).length
 		varuint.bitLength(l) + 8*l
@@ -128,6 +130,7 @@ class Utf8String extends Type
 
 class Scaled extends Type
 	constructor: (@type, @min, @max) -> super()
+	create: -> @min
 	bitLength: -> @type.bits
 	unpackFrom: (r) -> scale @type.unpackFrom(r), @type.min, @type.max, @min, @max
 	packInto: (w, v) -> @type.packInto w, scale v, @min, @max, @type.min, @type.max
@@ -139,6 +142,7 @@ class Enum extends Type
 		for name, i in @members
 			@index[name] = i
 		@bits = bitsNeeded @members.length - 1
+	create: -> @members[0]
 	bitLength: -> @bits
 	unpackFrom: (r) -> @members[r.readBits @bits]
 	packInto: (w, v) ->
@@ -158,6 +162,7 @@ class Optional extends Type
 
 class List extends Type
 	constructor: (@type) -> super()
+	create: -> []
 	bitLength: (v) ->
 		s = varuint.bitLength v.length
 		for x in v
@@ -174,6 +179,11 @@ class List extends Type
 
 class Struct extends Type
 	constructor: (@members) -> super()
+	create: ->
+		result = {}
+		for [name, type, value] in @members
+			result[name] = value ? type.create?()
+		result
 	bitLength: (v) ->
 		s = 0
 		for [name, type] in @members
