@@ -10,6 +10,7 @@
 #include <vector>
 #include <optional>
 #include <variant>
+#include <limits>
 
 namespace bw
 {
@@ -18,11 +19,11 @@ namespace bw
 
 	struct Reader
 	{
-		Reader(const char* from, const char* to) : from(from), to(to) {}
-		Reader(std::string_view src) : from(src.data()), to(src.data() + src.size()) {}
-		Reader(const std::vector<char>& src) : from(src.data()), to(src.data() + src.size()) {}
+		Reader(const char* from, const char* to) noexcept : from(from), to(to) {}
+		Reader(std::string_view src) noexcept : from(src.data()), to(src.data() + src.size()) {}
+		Reader(const std::vector<char>& src) noexcept : from(src.data()), to(src.data() + src.size()) {}
 
-		size_t size() const { return to - from; }
+		size_t size() const noexcept { return to - from; }
 
 		void read(void* dest, size_t len)
 		{
@@ -64,7 +65,7 @@ namespace bw
 
 	struct Writer
 	{
-		Writer(std::vector<char>& dest) : dest(dest) {}
+		Writer(std::vector<char>& dest) noexcept : dest(dest) {}
 
 		void write(const void* src, size_t len)
 		{
