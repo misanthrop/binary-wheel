@@ -60,11 +60,11 @@ generate = (publicTypes, namespace = '') ->
 	bw.Scaled::typename = (hint = 'Scaled') -> @spec = "bw::Scaled<#{@type.name}, #{templateFloat @min}, #{templateFloat @max}>"
 	bw.Enum::typename = (hint = 'Enum') -> newName hint
 
-	bw.Struct::typename = (hint = 'Struct') ->
+	bw.Struct::typename = (hint = '') ->
 		for [name, type] in @members
 			throw new Error "Undefined type of #{hint}.#{name}" if not type
-			register type, capitalizeFirstLetter name
-		newName hint
+			register type, hint + capitalizeFirstLetter name
+		newName hint or 'Struct'
 
 	bw.Struct::dependencies = ->
 		deps = {}
@@ -79,7 +79,7 @@ generate = (publicTypes, namespace = '') ->
 		deps
 
 	bw.Enum::declaration = -> "enum class #{@name} : uint8_t { #{@members.join ', '} }"
-	bw.Enum::adapter = -> "template<> constexpr int EnumCount<#{namespace}::#{@name}> = #{@members.length};"
+	bw.Enum::adapter = -> "template<> struct Type<#{namespace}::#{@name}> : EnumType<#{namespace}::#{@name}, #{@members.length}> {};"
 
 	cppValue = (value) ->
 		if value instanceof Array

@@ -14,8 +14,7 @@
 
 namespace bw
 {
-	template<typename T> constexpr int EnumCount = 0;
-	template<typename T, typename = void> struct Type;
+	template<typename T> struct Type;
 
 	struct Reader
 	{
@@ -128,7 +127,7 @@ namespace bw
 		auto& operator=(float v) { value = scale(v, min(), max(), std::numeric_limits<U>::min(), std::numeric_limits<U>::max()); return *this; }
 	};
 
-	template<typename T, typename> struct Type
+	template<typename T> struct Type
 	{
 		static std::string toString(const T& x) { return bw::toString(~x); }
 		static constexpr size_t bitLength(const T& x) { return bw::bitLength(~x); }
@@ -145,30 +144,41 @@ namespace bw
 		static void packInto(Writer& w, const T& x) { w.pack<U>(x.value); }
 	};
 
-	template<> struct Type<bool>
+	template<typename T, uint8_t Bits> struct BitsType
+	{
+		static constexpr uint8_t bits = Bits;
+		static constexpr size_t bitLength(const T&) { return bits; }
+		static bool unpack(Reader& r) { return static_cast<T>(r.readBits(bits)); }
+		static void packInto(Writer& w, const T& x) { w.writeBits(static_cast<uint32_t>(x), bits); }
+	};
+
+	template<typename T, int Count> struct EnumType : BitsType<T, bitsNeeded(Count - 1)>
+	{
+		static constexpr int count = Count;
+	};
+
+	template<> struct Type<bool> : BitsType<bool, 1>
 	{
 		static std::string toString(const bool& x) { return x ? "+" : "-"; }
-		static constexpr size_t bitLength(const bool&) { return 1; }
-		static bool unpack(Reader& r) { return r.readBits(1); }
-		static void packInto(Writer& w, const bool& x) { w.writeBits(x, 1); }
 	};
 
-	template<typename T> struct Type<T, std::enable_if_t<std::is_enum_v<T>, void>>
-	{
-		static constexpr uint8_t bits = bitsNeeded(EnumCount<T> - 1);
-		static std::string toString(const T& x) { return std::to_string((uint8_t)x); }
-		static constexpr size_t bitLength(const T&) { return bits; }
-		static T unpack(Reader& r) { return (T)r.readBits(bits); }
-		static void packInto(Writer& w, const T& x) { w.writeBits((uint32_t)x, bits); }
-	};
-
-	template<typename T> struct Type<T, std::enable_if_t<std::is_arithmetic_v<T>, void>>
+	template<typename T> struct NumberType
 	{
 		static std::string toString(const T& x) { return std::to_string(x); }
 		static constexpr size_t bitLength(const T&) { return 8*sizeof(T); }
 		static T unpack(Reader& r) { T x; r.read(&x, sizeof(T)); return x; }
 		static void packInto(Writer& w, const T& x) { w.write(&x, sizeof(T)); }
 	};
+
+	template<> struct Type<int8_t> : NumberType<int8_t> {};
+	template<> struct Type<int16_t> : NumberType<int16_t> {};
+	template<> struct Type<int32_t> : NumberType<int32_t> {};
+	template<> struct Type<int64_t> : NumberType<int64_t> {};
+	template<> struct Type<uint8_t> : NumberType<uint8_t> {};
+	template<> struct Type<uint16_t> : NumberType<uint16_t> {};
+	template<> struct Type<uint32_t> : NumberType<uint32_t> {};
+	template<> struct Type<uint64_t> : NumberType<uint64_t> {};
+	template<> struct Type<float> : NumberType<float> {};
 
 	namespace varint
 	{
